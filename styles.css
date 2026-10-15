@@ -114,6 +114,25 @@ a { color: inherit; }
 .present-button:hover { border-color: var(--orange); background: rgba(244,119,67,.1); transform: translateY(-1px); }
 .present-icon { color: var(--orange); font-size: 15px; line-height: 1; }
 
+/* Link to the interactive 3D model page (complex.html) */
+.model-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 1px solid rgba(95,206,180,.38);
+  border-radius: 999px;
+  background: rgba(95,206,180,.08);
+  color: #edf1ec;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-decoration: none;
+  transition: background .2s ease, border-color .2s ease, transform .2s ease;
+}
+.model-button:hover { border-color: var(--mint); background: rgba(95,206,180,.16); transform: translateY(-1px); }
+.model-icon { color: var(--mint); font-size: 15px; line-height: 1; }
+
 .main-content { width: min(1320px, calc(100% - 48px)); margin: 0 auto; flex: 1; display: flex; flex-direction: column; }
 .deck-overline {
   min-height: 48px;
@@ -480,6 +499,9 @@ body.is-presenting .deck-nav { padding-top: 10px; }
   .deck-label { display: none; }
   .present-button { padding: 8px 10px; font-size: 0; }
   .present-icon { font-size: 17px; }
+  .model-button { padding: 8px 10px; }
+  .model-label { display: none; }
+  .model-icon { font-size: 17px; }
   .language-tab { min-width: 31px; padding: 7px 8px; font-size: 9px; }
   .main-content { width: min(100% - 26px, 620px); }
   .deck-overline { min-height: 42px; font-size: 8px; letter-spacing: .13em; }

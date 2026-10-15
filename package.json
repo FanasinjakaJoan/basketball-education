@@ -1,0 +1,23 @@
+{
+  "name": "hoop-horizons-madagascar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hoop Horizons Madagascar — trilingual pitch deck plus a real-time 3D smart sports complex & residence (WebGL).",
+  "main": "app.js",
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --format=iife --minify --target=es2020 --legal-comments=none --outfile=assets/smart-complex.bundle.js",
+    "watch": "esbuild src/index.js --bundle --format=iife --target=es2020 --legal-comments=none --outfile=assets/smart-complex.bundle.js --watch",
+    "verify": "node tools/verify-scene.mjs",
+    "serve": "python3 -m http.server 8080 --bind 0.0.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FanasinjakaJoan/basketball-education.git"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "puppeteer-core": "^25.14.0",
+    "three": "0.169.0"
+  }
+}

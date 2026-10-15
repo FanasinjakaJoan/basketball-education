@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#060b12" />
+    <meta
+      name="description"
+      content="Super Smart Sports Complex & Residence — real-time 3D architectural model and cinematic fly-through for two professional basketball teams."
+    />
+    <title>Super Smart Sports Complex &amp; Residence — 3D</title>
+    <link rel="stylesheet" href="assets/complex.css" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <canvas id="scene" class="scene" aria-label="3D model of the Super Smart Sports Complex and Residence"></canvas>
+
+      <div class="letterbox letterbox-top" aria-hidden="true"></div>
+      <div class="letterbox letterbox-bottom" aria-hidden="true"></div>
+
+      <header class="hud-top">
+        <a class="brand" href="index.html" id="brand">
+          <span class="brand-mark" aria-hidden="true"><i></i></span>
+          <span class="brand-text">
+            <strong data-i18n="brand">Hoop Horizons</strong>
+            <small data-i18n="brandSub">Super Smart Complex · 3D model</small>
+          </span>
+        </a>
+
+        <p class="overline" data-i18n="overline">Basketball education · smart facility studio</p>
+
+        <div class="top-actions">
+          <div class="lang-switch" id="lang-switch" role="tablist" aria-label="Language">
+            <button type="button" class="lang-tab is-active" data-lang="en">EN</button>
+            <button type="button" class="lang-tab" data-lang="fr">FR</button>
+            <button type="button" class="lang-tab" data-lang="mg">MG</button>
+          </div>
+          <button type="button" class="ghost-button" id="help-button" data-i18n="help">Shortcuts</button>
+          <a class="ghost-button deck-link" href="index.html" data-i18n="backToDeck">Deck</a>
+        </div>
+      </header>
+
+      <aside class="panel panel-left" id="panel-left">
+        <div class="panel-block">
+          <h2 class="panel-title" data-i18n="modesLabel">View mode</h2>
+          <div class="mode-switch" id="mode-switch">
+            <button type="button" data-mode="cinematic" class="is-active" data-i18n="modes.cinematic">Cinematic</button>
+            <button type="button" data-mode="explore" data-i18n="modes.explore">Explore</button>
+            <button type="button" data-mode="plan" data-i18n="modes.plan">Floor plan</button>
+          </div>
+        </div>
+
+        <div class="panel-block">
+          <h2 class="panel-title" data-i18n="timelineLabel">35-second cinematic sequence</h2>
+          <div class="transport">
+            <button type="button" class="round-button" id="play-button" aria-label="Play">
+              <span class="icon-play" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="round-button ghost" id="restart-button" aria-label="Restart">
+              <span class="icon-restart" aria-hidden="true"></span>
+            </button>
+            <label class="speed">
+              <span data-i18n="speed">Speed</span>
+              <select id="speed-select">
+                <option value="0.5">0.5×</option>
+                <option value="1" selected>1×</option>
+                <option value="1.5">1.5×</option>
+                <option value="2">2×</option>
+              </select>
+            </label>
+          </div>
+          <div class="scrub-wrap">
+            <div class="scrub" id="scrub" role="slider" tabindex="0" aria-label="Sequence position" aria-valuemin="0" aria-valuemax="35" aria-valuenow="0">
+              <span class="scrub-fill" id="scrub-fill"></span>
+              <span class="scrub-handle" id="scrub-handle"></span>
+              <span class="scrub-marks" id="scrub-marks"></span>
+            </div>
+          </div>
+          <div class="chapters" id="chapters"></div>
+        </div>
+
+        <div class="panel-block">
+          <h2 class="panel-title" data-i18n="qualityTitle">Render quality</h2>
+          <div class="chip-row" id="quality-row">
+            <button type="button" class="chip" data-quality="low" data-i18n="quality.low">Performance</button>
+            <button type="button" class="chip" data-quality="medium" data-i18n="quality.medium">Balanced</button>
+            <button type="button" class="chip is-active" data-quality="high" data-i18n="quality.high">Cinematic</button>
+            <button type="button" class="chip" data-quality="ultra" data-i18n="quality.ultra">Ultra 4K</button>
+          </div>
+          <div class="chip-row">
+            <button type="button" class="chip" id="capture-button" data-i18n="capture">Capture 4K still</button>
+            <button type="button" class="chip" id="letterbox-button" data-i18n="letterbox">Cinema bars</button>
+          </div>
+        </div>
+      </aside>
+
+      <aside class="panel panel-right" id="panel-right">
+        <div class="panel-block">
+          <h2 class="panel-title" data-i18n="zonesTitle">Zones &amp; systems</h2>
+          <p class="panel-hint" data-i18n="zonesHint">Select a zone to fly the camera there.</p>
+          <ul class="zone-list" id="zone-list"></ul>
+          <div class="zone-detail" id="zone-detail" hidden></div>
+        </div>
+
+        <div class="panel-block">
+          <h2 class="panel-title" data-i18n="iotTitle">Smart / IoT layers</h2>
+          <div class="toggle-grid" id="toggle-grid"></div>
+          <div class="chip-row" id="scenario-row"></div>
+        </div>
+
+        <div class="panel-block">
+          <h2 class="panel-title" data-i18n="telemetryTitle">Player telemetry</h2>
+          <div class="telemetry" id="telemetry"></div>
+        </div>
+
+        <div class="panel-block">
+          <h2 class="panel-title" data-i18n="power">Complex systems</h2>
+          <div class="gauges" id="gauges"></div>
+        </div>
+
+        <div class="panel-block">
+          <h2 class="panel-title" data-i18n="logTitle">IoT event log</h2>
+          <ol class="log" id="log"></ol>
+        </div>
+      </aside>
+
+      <footer class="hud-bottom">
+        <div class="timecode">
+          <span class="rec-dot" aria-hidden="true"></span>
+          <span id="timecode">00:00.0</span>
+          <span class="timecode-total" id="timecode-total">/ 00:35.0</span>
+        </div>
+        <div class="bottom-bar">
+          <span class="chapter-name" id="chapter-name"></span>
+          <div class="bottom-progress"><span id="bottom-progress-fill"></span></div>
+          <span class="fps" id="fps">60 fps</span>
+        </div>
+      </footer>
+
+      <div class="help-sheet" id="help-sheet" hidden>
+        <div class="help-inner">
+          <h2 data-i18n="help">Shortcuts</h2>
+          <p data-i18n="helpText"></p>
+          <button type="button" class="chip" id="help-close" data-i18n="close">Close</button>
+        </div>
+      </div>
+
+      <div class="toast" id="toast" hidden></div>
+
+      <div class="loading" id="loading">
+        <div class="loading-inner">
+          <span class="loading-ball" aria-hidden="true"></span>
+          <p data-i18n="loading">Building the complex…</p>
+        </div>
+      </div>
+
+      <svg class="minimap" id="minimap" viewBox="0 0 220 150" hidden aria-hidden="true"></svg>
+    </div>
+
+    <script src="assets/smart-complex.bundle.js"></script>
+  </body>
+</html>

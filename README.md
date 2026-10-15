@@ -17,17 +17,19 @@ Everything is served statically: no server-side code, no network calls, no build
 ```bash
 npm install                 # three 0.169 · esbuild · puppeteer-core (dev only)
 npm run build               # bundles src/ → assets/smart-complex.bundle.js
-npm run serve               # static server on http://localhost:8080
+npm run serve               # static server on http://localhost:8000 (PORT=8080 to change)
 npm run verify              # headless smoke test of complex.html
+npm run stills              # re-capture docs/stills/ from the film (optional, slow)
 ```
 
-* Open `http://localhost:8080/index.html` for the deck (it links to the 3D model from the top bar).
-* Open `http://localhost:8080/complex.html` for the model.
+* Open `http://localhost:8000/index.html` for the deck (it links to the 3D model from the top bar).
+* Open `http://localhost:8000/complex.html` for the model.
 * Rebuild the drawing sheet at any time with `node tools/build-plan-svg.mjs` → `docs/floor-plan.svg`.
+* `npm run stills` needs the same Chromium as `npm run verify`; it writes `docs/stills/`.
 
 > `npm run verify` needs a Chromium. It uses `CHROME_PATH` when set, otherwise Puppeteer's own
-> download. The `serve` script binds `0.0.0.0:8080`, so the same URL works from a phone on the
-> LAN or from a sandbox preview proxy.
+> download. The `serve` script binds `0.0.0.0:8000` (`PORT=... npm run serve` to change it), so
+> the same URL works from a phone on the LAN or from a sandbox preview proxy.
 
 ---
 
@@ -187,11 +189,27 @@ python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('docs/floor-plan.svg')
 
 ---
 
+## Renders — `docs/stills/`
+
+Six stills captured headlessly from the running model (`npm run stills`, 1280 × 720, `medium`
+quality, deterministic timecodes), kept in the repository as the visual reference for the film:
+
+| Still | Film | Shows |
+| --- | --- | --- |
+| <img src="docs/stills/01-drone-approach.png" width="380" alt="Drone descent over the complex"> | 0:00.5 | **Drone descent** — the extruded envelope, PV array, jogging loop and adaptive landscape lighting seen from the descent path |
+| <img src="docs/stills/02-court-awakening.png" width="380" alt="Court level, LED floor activating"> | 0:08.0 | **Court activation** — court level during the LED sweep, players on the resin floor, gantry rails overhead |
+| <img src="docs/stills/03-dorm-pods.png" width="380" alt="Dormitory pods"> | 0:19.0 | **Residence** — first-person height through the wing toward the smart pods |
+| <img src="docs/stills/04-tactical-ops.png" width="380" alt="Tactical operations centre"> | 0:27.5 | **Tactical ops centre** — mezzanine war room looking over the court |
+| <img src="docs/stills/05-vip-finale.png" width="380" alt="VIP deck finale"> | 0:32.5 | **VIP finale** — the elevated deck at the end of the ascent |
+| <img src="docs/stills/06-floorplan-mode.png" width="380" alt="Floor-plan cutaway mode"> | plan mode | **Floor-plan mode** — roof, pods and glazing hidden; the layout reads like the drawing sheet |
+
+---
+
 ## Verification
 
 ```bash
 npm run build
-npm run serve &                                     # or any static server on :8080
+npm run serve &                                     # or any static server on :8000
 CHROME_PATH=/path/to/chrome node tools/verify-scene.mjs
 ```
 

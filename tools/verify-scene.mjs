@@ -3,8 +3,8 @@
  * Headless smoke test for the Super Smart Complex.
  *
  *   npm run build
- *   npm run serve      # in another shell (python3 -m http.server 8080)
- *   node tools/verify-scene.mjs [--url http://localhost:8080/complex.html]
+ *   npm run serve      # in another shell (python3 -m http.server 8000)
+ *   node tools/verify-scene.mjs [--url http://localhost:8000/complex.html]
  *
  * Checks that the bundle boots, WebGL 2 is available, all zones are built, the
  * HUD is wired, and that every chapter of the 35 s storyboard renders without
@@ -15,7 +15,7 @@ import { existsSync } from "node:fs";
 
 const args = process.argv.slice(2);
 const urlFlag = args.indexOf("--url");
-const url = urlFlag >= 0 ? args[urlFlag + 1] : "http://localhost:8080/complex.html";
+const url = urlFlag >= 0 ? args[urlFlag + 1] : "http://localhost:8000/complex.html";
 
 let puppeteer;
 try {

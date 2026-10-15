@@ -17,9 +17,11 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
 import { STRINGS, t as tr } from "./i18n.js";
-import { ZONES, zoneById, SITE } from "./plan.js";
+import { ZONES, zoneById, quickViewById, SITE, HALL, COURT } from "./plan.js";
 import { createMaterials, PALETTE } from "./lib/materials.js";
 import { HoloRegistry } from "./lib/holo.js";
+import { createLightShafts } from "./lib/volumetrics.js";
+import { createCourtMirror } from "./lib/mirror.js";
 import { clamp, smoothstep } from "./lib/util.js";
 import { createIotModel, SCENARIOS } from "./iot.js";
 import { CinematicDirector, CHAPTERS, FILM_DURATION } from "./cinematic.js";
@@ -34,11 +36,33 @@ import { buildLandscape } from "./zones/landscape.js";
 /* ------------------------------------------------------------------ */
 
 const QUALITY = {
-  low: { pixelRatio: 0.85, shadows: false, bloom: 0.22, smaa: false, anisotropy: 2, trees: 60, label: "low" },
-  medium: { pixelRatio: 1, shadows: false, bloom: 0.32, smaa: false, anisotropy: 4, trees: 90, label: "medium" },
-  high: { pixelRatio: Math.min(window.devicePixelRatio, 1.5), shadows: true, bloom: 0.42, smaa: true, anisotropy: 8, trees: 120, label: "high" },
-  ultra: { pixelRatio: Math.min(window.devicePixelRatio, 2), shadows: true, bloom: 0.5, smaa: true, anisotropy: 16, trees: 150, label: "ultra" },
+  low: { pixelRatio: 0.85, shadows: false, bloom: 0.28, smaa: false, anisotropy: 2, trees: 60, label: "low" },
+  medium: { pixelRatio: 1, shadows: false, bloom: 0.4, smaa: false, anisotropy: 4, trees: 90, label: "medium" },
+  high: { pixelRatio: Math.min(window.devicePixelRatio, 1.5), shadows: true, bloom: 0.55, smaa: true, anisotropy: 8, trees: 120, label: "high" },
+  ultra: { pixelRatio: Math.min(window.devicePixelRatio, 2), shadows: true, bloom: 0.62, smaa: true, anisotropy: 16, trees: 150, label: "ultra" },
 };
+
+/* Bloom shaping, per the brief: a tight halo, only on genuinely hot pixels. */
+const BLOOM_RADIUS = 0.5;
+const BLOOM_THRESHOLD = 0.85;
+
+/* Tone mapping. ACES filmic is the default, as specified; `?tone=agx` (or
+ * `smartComplex.tone("agx")`) switches the AgX pipeline back on for anyone who
+ * prefers the softer, more filmic highlights. */
+const TONE_MAPPING = {
+  aces: { mapping: THREE.ACESFilmicToneMapping, exposure: 0.92, label: "ACES Filmic" },
+  agx: { mapping: THREE.AgXToneMapping, exposure: 0.74, label: "AgX" },
+  neutral: { mapping: THREE.NeutralToneMapping, exposure: 0.86, label: "Neutral" },
+};
+
+function readToneMapping() {
+  const requested = new URLSearchParams(window.location.search).get("tone");
+  const key = requested && TONE_MAPPING[requested] ? requested : "aces";
+  const exposureParam = Number(new URLSearchParams(window.location.search).get("exposure"));
+  const preset = { ...TONE_MAPPING[key] };
+  if (Number.isFinite(exposureParam) && exposureParam > 0) preset.exposure = exposureParam;
+  return { key, ...preset };
+}
 
 /* ------------------------------------------------------------------ */
 /* sky                                                                 */
@@ -124,15 +148,18 @@ export function startExperience({ ui, language = "en" }) {
   }
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x4a6076, 150, 900);
+  // exponential fog: the same atmospheric falloff the linear Fog approximated,
+  // but it stays correct as the camera pushes through the wings
+  scene.fog = new THREE.FogExp2(0x4a6076, 0.0021);
 
   const camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 2600);
   camera.position.set(96, 74, 124);
   camera.lookAt(0, 14, 0);
 
+  const tone = readToneMapping();
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.AgXToneMapping;
-  renderer.toneMappingExposure = 0.74;
+  renderer.toneMapping = tone.mapping;
+  renderer.toneMappingExposure = tone.exposure;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.info.autoReset = true;
 
@@ -146,7 +173,7 @@ export function startExperience({ ui, language = "en" }) {
   const sky = createSky();
   scene.add(sky.mesh);
 
-  const sun = new THREE.DirectionalLight(0xffd3a4, 1.9);
+  const sun = new THREE.DirectionalLight(0xffc98a, 2.2);
   sun.position.set(-105, 68, 128);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -161,7 +188,8 @@ export function startExperience({ ui, language = "en" }) {
   scene.add(sun);
   scene.add(sun.target);
 
-  const hemi = new THREE.HemisphereLight(0x9cc4e8, 0x2b2f38, 0.32);
+  // cool blue skylight dome: the shadow side of the complex is never black
+  const hemi = new THREE.HemisphereLight(0x9cc4e8, 0x2b2f38, 0.35);
   scene.add(hemi);
   const ambient = new THREE.AmbientLight(0x22384c, 0.34);
   scene.add(ambient);
@@ -196,6 +224,9 @@ export function startExperience({ ui, language = "en" }) {
     tracking: true,
     electro: true,
     water: true,
+    // view switches, kept in the same bag so the HUD has one code path
+    xray: false,
+    mirrorFloor: false,
   };
   const director = new CinematicDirector();
 
@@ -232,22 +263,49 @@ export function startExperience({ ui, language = "en" }) {
   worldRoot.add(landscape.group);
   updates.push(landscape.update);
 
+  /* ---------- volumetric light shafts ---------- */
+  const shafts = createLightShafts({
+    skylights: shell.skylights,
+    wallHeight: HALL.wallHeight,
+    entranceZ: HALL.entranceZ,
+    playerZ: HALL.playerZ,
+    sunDir: new THREE.Vector3().copy(sun.position).normalize(),
+  });
+  worldRoot.add(shafts.group);
+
+  /* ---------- polished resin reflection ---------- */
+  // Layer 2 is *only* what the mirror pass renders: the court furniture and
+  // the athletes. Everything else stays out of the reflection, which keeps the
+  // extra pass to a few hundred triangles instead of the whole complex.
+  const mirror = createCourtMirror({
+    length: COURT.length,
+    width: COURT.width,
+    layer: 2,
+    opacity: 0.44,
+    resolution: quality.shadows ? 1024 : 512,
+  });
+  worldRoot.add(mirror.mesh);
+  mirror.tags([court.group, court.scoreboard?.group, ...court.hoops.map((hoop) => hoop.group)]);
+
   /* ---------- post processing ---------- */
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
     quality.bloom,
-    0.55,
-    0.92
+    BLOOM_RADIUS,
+    BLOOM_THRESHOLD
   );
   composer.addPass(bloom);
-  if (quality.smaa) {
-    const smaa = new SMAAPass(window.innerWidth * quality.pixelRatio, window.innerHeight * quality.pixelRatio);
-    composer.addPass(smaa);
-  }
+  // tone mapping + colour space first, then anti-aliasing on the resolved
+  // image: SMAA in linear HDR space would be measuring the wrong edges
   const output = new OutputPass();
   composer.addPass(output);
+  let smaa = null;
+  if (quality.smaa) {
+    smaa = new SMAAPass(window.innerWidth * quality.pixelRatio, window.innerHeight * quality.pixelRatio);
+    composer.addPass(smaa);
+  }
 
   /* ---------- controls ---------- */
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -268,11 +326,19 @@ export function startExperience({ ui, language = "en" }) {
   worldRoot.traverse((child) => {
     if (child.userData && child.userData.cutaway) cutawayObjects.push(child);
   });
+  /**
+   * X-ray: everything tagged `cutaway` (roof, ceilings, the glass envelope,
+   * upper pods) is hidden so the layout reads from above. Used by plan mode,
+   * and switchable on its own from the HUD at any time.
+   */
   function setCutaway(enabled) {
     cutawayObjects.forEach((child) => {
       child.visible = !enabled;
     });
-    landscape.labels.visible = false;
+    landscape.labels.visible = !enabled;
+    // beams and reflections belong to the built volume: no roof, no shafts
+    shafts.group.visible = !enabled;
+    mirror.mesh.visible = !enabled && Boolean(runtime.toggles.mirrorFloor);
   }
 
   /* ---------- render sizing ---------- */
@@ -298,17 +364,70 @@ export function startExperience({ ui, language = "en" }) {
   let fps = 60;
   let uiAccum = 0;
   let paused = false;
+  let xrayOn = false;
   const tmpVec = new THREE.Vector3();
   const letterbox = { value: true };
+
+  /* ---------- film recording (WebM straight off the WebGL canvas) ---------- */
+  let recorder = null;
+  let recorderStream = null;
+  const recordListeners = new Set();
+
+  function pickMimeType() {
+    const candidates = [
+      "video/webm;codecs=vp9",
+      "video/webm;codecs=vp8",
+      "video/webm",
+      "video/mp4",
+    ];
+    return candidates.find((type) => window.MediaRecorder?.isTypeSupported?.(type)) || "";
+  }
+
+  function startRecording(bitrate = 24_000_000) {
+    if (!window.MediaRecorder || !canvas.captureStream) return false;
+    if (recorder?.state === "recording") return true;
+    try {
+      recorderStream = canvas.captureStream(60);
+      recorder = new MediaRecorder(recorderStream, {
+        mimeType: pickMimeType(),
+        videoBitsPerSecond: bitrate,
+      });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn("recording unavailable", error);
+      return false;
+    }
+    const chunks = [];
+    recorder.ondataavailable = (event) => {
+      if (event.data?.size) chunks.push(event.data);
+    };
+    recorder.onstop = () => {
+      const type = recorder.mimeType || "video/webm";
+      const blob = new Blob(chunks, { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `smart-complex-${Date.now()}.${type.includes("mp4") ? "mp4" : "webm"}`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      recorderStream?.getTracks().forEach((track) => track.stop());
+      recorderStream = null;
+      recordListeners.forEach((fn) => fn({ state: "idle", url }));
+    };
+    recorder.start(1000);
+    recordListeners.forEach((fn) => fn({ state: "recording", startedAt: performance.now() }));
+    return true;
+  }
 
   const api = {
     director,
     // exposed for tuning / diagnostics (also handy in the presenter console)
-    tuning: { renderer, sun, hemi, ambient, interiorFill, sky, bloom, materials, scene, camera },
+    tuning: { renderer, sun, hemi, ambient, interiorFill, sky, bloom, materials, scene, camera, shafts, mirror, tone },
     runtime,
     scene,
     camera,
     renderer,
+    toneMapping: tone.key,
     setMode(mode) {
       director.mode = mode;
       api.mode = mode;
@@ -334,6 +453,21 @@ export function startExperience({ ui, language = "en" }) {
         camera.lookAt(0, 2, 0);
       }
       return mode;
+    },
+    /** Guided jump: fly to one of the nine HUD viewpoints. */
+    focusView(id) {
+      const view = quickViewById(id);
+      if (!view) return null;
+      if (director.mode === "cinematic") api.setMode("explore");
+      director.flyTo(view.preset, 2.4);
+      controls.enabled = false;
+      setTimeout(() => {
+        if (api.mode === "explore") {
+          controls.enabled = true;
+          controls.target.set(...(view.preset.target || [0, 2, 0]));
+        }
+      }, 2500);
+      return view;
     },
     focusZone(id) {
       const zone = zoneById(id);
@@ -361,6 +495,11 @@ export function startExperience({ ui, language = "en" }) {
       if (!next) return;
       Object.assign(quality, next);
       renderer.shadowMap.enabled = quality.shadows;
+      if (bloom) {
+        bloom.strength = quality.bloom;
+        bloom.radius = BLOOM_RADIUS;
+        bloom.threshold = BLOOM_THRESHOLD;
+      }
       materials.concrete.needsUpdate = true;
       scene.traverse((child) => {
         if (child.isMesh && child.material) {
@@ -423,8 +562,67 @@ export function startExperience({ ui, language = "en" }) {
     setLetterbox(value) {
       letterbox.value = value;
     },
+    /** Switch the tone-mapping pipeline at runtime: "aces" | "agx" | "neutral". */
+    setToneMapping(key, exposure) {
+      const preset = TONE_MAPPING[key];
+      if (!preset) return api.toneMapping;
+      renderer.toneMapping = preset.mapping;
+      renderer.toneMappingExposure = exposure ?? preset.exposure;
+      Object.assign(tone, preset, { key });
+      api.toneMapping = key;
+      scene.traverse((child) => {
+        if (child.isMesh && child.material) child.material.needsUpdate = true;
+      });
+      return key;
+    },
+    setExposure(value) {
+      renderer.toneMappingExposure = Math.max(0.05, value);
+      tone.exposure = renderer.toneMappingExposure;
+      return renderer.toneMappingExposure;
+    },
+    /** X-ray: hide roof, ceilings, envelope and upper pods. */
+    setXray(value) {
+      runtime.toggles.xray = Boolean(value);
+      setCutaway(Boolean(value) || api.mode === "plan");
+      return runtime.toggles.xray;
+    },
+    /** Polished-resin reflection on the court (extra pass, off by default). */
+    setMirrorFloor(value) {
+      runtime.toggles.mirrorFloor = Boolean(value);
+      mirror.mesh.visible = runtime.toggles.mirrorFloor && !runtime.toggles.xray;
+      return runtime.toggles.mirrorFloor;
+    },
+    setShaftIntensity(value) {
+      shafts.setIntensity(value);
+      return value;
+    },
+    /* ---------------- film recording ---------------- */
+    get recording() {
+      return recorder?.state === "recording";
+    },
+    onRecordEvent(fn) {
+      recordListeners.add(fn);
+      return () => recordListeners.delete(fn);
+    },
+    toggleRecord() {
+      if (recorder?.state === "recording") {
+        recorder.stop();
+        return false;
+      }
+      return startRecording();
+    },
+    beginRecord() {
+      return startRecording();
+    },
+    endRecord() {
+      if (recorder?.state !== "recording") return false;
+      recorder.stop();
+      return true;
+    },
     dispose() {
       window.removeEventListener("resize", resize);
+      recorder?.state === "recording" && recorder.stop();
+      mirror.mesh.dispose?.();
       renderer.dispose();
       pmrem.dispose();
     },
@@ -501,8 +699,22 @@ export function startExperience({ ui, language = "en" }) {
       vip.update(elapsed, dt, runtimeState);
       registry.update(dt, runtime);
 
+      // ---- view switches (x-ray, polished-resin reflection) ----
+      const wantXray = Boolean(runtime.toggles.xray) || api.mode === "plan";
+      if (wantXray !== xrayOn) {
+        xrayOn = wantXray;
+        setCutaway(xrayOn);
+      }
+      const wantMirror = Boolean(runtime.toggles.mirrorFloor) && !xrayOn;
+      if (mirror.mesh.visible !== wantMirror) mirror.mesh.visible = wantMirror;
+      if (mirror.mesh.visible) mirror.update(elapsed);
+
+      // ---- volumetric beams ----
+      shafts.update(elapsed);
+      shafts.setIntensity(0.86 + Math.sin(elapsed * 0.08) * 0.1);
+
       // ---- global light modulation ----
-      sun.intensity = (quality.shadows ? 1.9 : 1.0) + Math.sin(elapsed * 0.05) * 0.12;
+      sun.intensity = (quality.shadows ? 2.2 : 1.15) + Math.sin(elapsed * 0.05) * 0.12;
       // interior fill follows the storyboard: dim while the drone is outside,
       // up to full inside the wings, back down for the finale panorama
       const filmT = director.mode === "cinematic" ? director.time : 20;

@@ -226,6 +226,7 @@ export const ZONES = [
     specs: [
       { label: "spec.water", value: "−68 % water use" },
       { label: "spec.cryo", value: "2 pods · −110 °C" },
+      { label: "spec.plunge", value: "2 ice baths · 4 °C" },
       { label: "spec.chromo", value: "6 programmes" },
       { label: "spec.mirror", value: "hydration index" },
     ],
@@ -324,4 +325,40 @@ export const ZONES = [
 
 export function zoneById(id) {
   return ZONES.find((zone) => zone.id === id) || ZONES[0];
+}
+
+/* ------------------------------------------------------------------ */
+/* Guided jumps — the nine viewpoints the HUD offers as quick buttons.  */
+/* Seven reuse the zone presets; the wet zone is split into two, because */
+/* the showers and the cryotherapy pods deserve their own framing.       */
+/* ------------------------------------------------------------------ */
+
+const zonePreset = (id) => ({ ...zoneById(id).preset });
+
+export const QUICK_VIEWS = [
+  { id: "court", label: { en: "Court", fr: "Terrain", mg: "Kianja" }, preset: zonePreset("court") },
+  { id: "alpha", label: { en: "Team Alpha", fr: "Équipe Alpha", mg: "Ekipa Alpha" }, preset: zonePreset("dormAlpha") },
+  { id: "beta", label: { en: "Team Beta", fr: "Équipe Beta", mg: "Ekipa Beta" }, preset: zonePreset("dormBeta") },
+  {
+    id: "showers",
+    label: { en: "Showers", fr: "Douches", mg: "Fandroana" },
+    preset: { pos: [-29.0, 2.7, -6.2], target: [-34.6, 1.7, -11.6], fov: 60 },
+  },
+  {
+    id: "recovery",
+    label: { en: "Cryotherapy", fr: "Cryothérapie", mg: "Cryothérapie" },
+    preset: { pos: [-28.0, 2.3, -18.8], target: [-30.6, 1.4, -15.4], fov: 58 },
+  },
+  { id: "command", label: { en: "Command", fr: "PC tactique", mg: "Baiko" }, preset: zonePreset("warroom") },
+  { id: "vip", label: { en: "VIP lounge", fr: "Salon VIP", mg: "Efitra VIP" }, preset: zonePreset("vip") },
+  { id: "exterior", label: { en: "Exterior", fr: "Extérieur", mg: "Ivelany" }, preset: zonePreset("landscape") },
+  {
+    id: "entrance",
+    label: { en: "Entrance", fr: "Entrée", mg: "Fidirana" },
+    preset: { pos: [0, 3.4, -36], target: [0, 3.2, -20], fov: 52 },
+  },
+];
+
+export function quickViewById(id) {
+  return QUICK_VIEWS.find((view) => view.id === id) || QUICK_VIEWS[0];
 }

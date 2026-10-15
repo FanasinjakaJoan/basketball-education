@@ -2,6 +2,7 @@
  * index.js — entry point: wires the HUD (ui.js) to the real-time scene (main.js).
  */
 import { createUi } from "./ui.js";
+import { STRINGS, t as tr } from "./i18n.js";
 import { startExperience } from "./main.js";
 
 let app = null;
@@ -21,11 +22,17 @@ const ui = createUi({
   },
   onChapter: (index) => app?.api.jumpToChapter(index),
   onZone: (id) => app?.api.focusZone(id),
+  onView: (id) => app?.api.focusView(id),
+  onRecord: () => app?.api.toggleRecord() ?? false,
   onScenario: (id) => app?.api.setScenario(id),
   onQuality: (key) => app?.api.setQuality(key),
   onCapture: async () => app?.api.capture(),
   onToggle: (key, value) => {
-    if (app) app.runtime.toggles[key] = value;
+    if (!app) return;
+    app.runtime.toggles[key] = value;
+    // these two change what the renderer draws, so push them through the API
+    if (key === "xray") app.api.setXray(value);
+    if (key === "mirrorFloor") app.api.setMirrorFloor(value);
   },
   onLetterbox: (value) => app?.api.setLetterbox(value),
   onLanguage: () => {
@@ -47,6 +54,12 @@ if (app) {
       setTimeout(() => ui.finishLoading(), 420);
     })
   );
+  app.api.onRecordEvent?.((event) => {
+    if (event.state === "idle") {
+      ui.setRecording(false);
+      ui.showToast(tr(STRINGS.recordSaved, ui.language));
+    }
+  });
   window.__smartComplex = app;
   // expose a tiny API for presentations / testing
   window.smartComplex = {
@@ -61,5 +74,10 @@ if (app) {
     scenario: (id) => app.api.setScenario(id),
     quality: (key) => app.api.setQuality(key),
     language: (code) => ui.setLanguage(code),
+    view: (id) => app.api.focusView(id),
+    xray: (value = true) => app.api.setXray(value),
+    mirror: (value = true) => app.api.setMirrorFloor(value),
+    tone: (key, exposure) => app.api.setToneMapping(key, exposure),
+    record: (value = true) => (value ? app.api.beginRecord() : app.api.endRecord()),
   };
 }

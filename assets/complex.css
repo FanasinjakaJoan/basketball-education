@@ -386,6 +386,17 @@ body.no-letterbox .letterbox-bottom { transform: translateY(120%); }
 .timecode-total { color: var(--text-dim); }
 .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff5a5a; box-shadow: 0 0 10px #ff5a5a; animation: blink 2.4s infinite; }
 @keyframes blink { 0%, 45% { opacity: 1; } 50%, 100% { opacity: .25; } }
+
+/* while a WebM film is being captured the whole HUD says so */
+body.is-recording .rec-dot { animation: blink .9s infinite; box-shadow: 0 0 16px #ff5a5a; }
+body.is-recording .timecode { color: #ffe2e2; }
+body.is-recording #record-button {
+  color: #1a0507;
+  background: linear-gradient(120deg, #ff8a8a, #ff5a5a);
+  border-color: transparent;
+  font-weight: 600;
+}
+.rec-time { font-size: 11px; letter-spacing: .12em; color: #ff9c9c; font-variant-numeric: tabular-nums; }
 .bottom-bar { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; }
 .chapter-name { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-dim); }
 .bottom-progress { height: 3px; border-radius: 99px; background: rgba(255, 255, 255, .12); overflow: hidden; }

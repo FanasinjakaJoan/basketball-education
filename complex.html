@@ -51,6 +51,12 @@
         </div>
 
         <div class="panel-block">
+          <h2 class="panel-title" data-i18n="viewTitle">Guided jumps</h2>
+          <p class="panel-hint" data-i18n="viewHint">Fly the camera straight to a key viewpoint.</p>
+          <div class="chip-row" id="quick-row"></div>
+        </div>
+
+        <div class="panel-block">
           <h2 class="panel-title" data-i18n="timelineLabel">35-second cinematic sequence</h2>
           <div class="transport">
             <button type="button" class="round-button" id="play-button" aria-label="Play">
@@ -88,7 +94,12 @@
             <button type="button" class="chip" data-quality="ultra" data-i18n="quality.ultra">Ultra 4K</button>
           </div>
           <div class="chip-row">
+            <button type="button" class="chip" id="xray-button" data-i18n="xray" aria-pressed="false">X-ray shell</button>
+            <button type="button" class="chip" id="mirror-button" data-i18n="mirrorFloor" aria-pressed="false">Mirror floor</button>
+          </div>
+          <div class="chip-row">
             <button type="button" class="chip" id="capture-button" data-i18n="capture">Capture 4K still</button>
+            <button type="button" class="chip" id="record-button" data-i18n="record" aria-pressed="false">Record film</button>
             <button type="button" class="chip" id="letterbox-button" data-i18n="letterbox">Cinema bars</button>
           </div>
         </div>
@@ -129,6 +140,7 @@
           <span class="rec-dot" aria-hidden="true"></span>
           <span id="timecode">00:00.0</span>
           <span class="timecode-total" id="timecode-total">/ 00:35.0</span>
+          <span class="rec-time" id="rec-time" hidden></span>
         </div>
         <div class="bottom-bar">
           <span class="chapter-name" id="chapter-name"></span>

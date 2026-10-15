@@ -8,6 +8,7 @@
     "build": "esbuild src/index.js --bundle --format=iife --minify --target=es2020 --legal-comments=none --outfile=assets/smart-complex.bundle.js",
     "watch": "esbuild src/index.js --bundle --format=iife --target=es2020 --legal-comments=none --outfile=assets/smart-complex.bundle.js --watch",
     "verify": "node tools/verify-scene.mjs",
+    "verify:modules": "node tools/verify-modules.mjs",
     "serve": "python3 -m http.server 8080 --bind 0.0.0.0"
   },
   "repository": {

@@ -77,15 +77,66 @@ const report = await page.evaluate(() => {
     app.api.jumpToChapter(chapter);
     for (let i = 0; i < 8; i++) app.api.step(1 / 60);
   }
+
+  /* ---- realism + navigation pass -------------------------------------- */
+  const toneBefore = app.api.toneMapping;
+  app.api.setToneMapping("agx");
+  const toneAfter = app.api.toneMapping;
+  app.api.setToneMapping(toneBefore);
+
+  // x-ray hides the tagged shell, then puts it back
+  const shellVisible = () => {
+    let hidden = 0;
+    let shown = 0;
+    app.scene.traverse((child) => {
+      if (child.userData && child.userData.cutaway) (child.visible ? shown++ : hidden++);
+    });
+    return { hidden, shown };
+  };
+  const cutawayOff = shellVisible();
+  app.api.setXray(true);
+  app.api.step(1 / 60);
+  const cutawayOn = shellVisible();
+  app.api.setXray(false);
+  app.api.step(1 / 60);
+
+  // the reflection is a second render pass, off until it is asked for
+  const mirrorBefore = app.api.tuning.mirror.mesh.visible;
+  app.api.setMirrorFloor(true);
+  app.api.step(1 / 60);
+  const mirrorOn = app.api.tuning.mirror.mesh.visible;
+  app.api.setMirrorFloor(false);
+
+  // guided jumps fly the camera, and every one of them moves it
+  const views = [...document.querySelectorAll("#quick-row .chip")].map((chip) => chip.dataset.view);
+  app.api.focusView("court");
+  for (let i = 0; i < 185; i++) app.api.step(1 / 60); // the fly-to tween is 2.4 s
+  const courtCam = app.camera.position.clone();
+
+  const shafts = app.api.tuning.shafts;
+
   return {
     ok: true,
     meshes,
     instanced,
     lights,
+    toneMapping: toneAfter,
+    cutawayOff,
+    cutawayOn,
+    mirrorBefore,
+    mirrorOn,
+    views,
+    courtCam: [courtCam.x, courtCam.y, courtCam.z],
+    shafts: shafts.shafts.length,
+    shaftsVisible: shafts.group.visible,
     zones: app.zones.length,
     duration: app.director.duration,
     hudZones: document.querySelectorAll("#zone-list .zone-button").length,
     toggles: document.querySelectorAll("#toggle-grid .toggle").length,
+    viewChips: document.querySelectorAll("#quick-row .chip").length,
+    recordButton: Boolean(document.getElementById("record-button")),
+    xrayButton: Boolean(document.getElementById("xray-button")),
+    mirrorButton: Boolean(document.getElementById("mirror-button")),
     chapters: document.querySelectorAll("#chapters .chapter").length,
     logLines: document.querySelectorAll("#log .log-line").length,
     telemetry: document.querySelectorAll("#telemetry .telemetry-row").length,
@@ -111,11 +162,29 @@ const expectations = [
   [report.telemetry === 5, "telemetry rows"],
   [report.meshes > 800, "mesh count"],
   [report.lights > 12, "light count"],
+  [report.views.length === 9 && report.viewChips === 9, "guided jumps"],
+  [report.xrayButton && report.mirrorButton && report.recordButton, "view + capture chips"],
+  [report.toneMapping === "agx", "tone-mapping switch"],
+  [report.cutawayOn.hidden > report.cutawayOff.hidden, "x-ray hides the shell"],
+  [report.cutawayOn.hidden === report.cutawayOff.hidden || report.cutawayOff.shown > 0, "x-ray restores the shell"],
+  [report.mirrorBefore === false && report.mirrorOn === true, "mirror floor is opt-in"],
+  [report.shafts === 9, "volumetric shafts"],
+  [report.shaftsVisible === true, "shafts visible"],
+  [
+    Math.abs(report.courtCam[0] - 10) < 2.5 &&
+      Math.abs(report.courtCam[1] - 4.6) < 2 &&
+      Math.abs(report.courtCam[2] - 12) < 2.5,
+    "guided jump lands on the court preset",
+  ],
 ];
 const failed = expectations.filter(([condition]) => !condition);
 console.log(
   `scene ok · meshes ${report.meshes} · instanced ${report.instanced} · lights ${report.lights} · ` +
     `zones ${report.zones} · film ${report.duration}s · event log ${report.logLines} lines`
+);
+console.log(
+  `realism · tone ${report.toneMapping} · shafts ${report.shafts} · mirror opt-in · ` +
+    `x-ray hides ${report.cutawayOn.hidden} parts · ${report.views.length} guided jumps`
 );
 if (failed.length) {
   console.error("Failed assertions:", failed.map(([, label]) => label).join(", "));

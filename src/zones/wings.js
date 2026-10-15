@@ -587,6 +587,156 @@ function buildGroundLevel({ side, team, materials, registry, screens }) {
     wet.add(pod);
   }
 
+  /* ---------- ice baths / cold plunge (along the glazed facade) ---------- */
+  // Two 4 °C plunge tubs per wing, set against the curtain wall so the low sun
+  // rakes across the water on the way in from the wet zone.
+  for (let i = 0; i < 2; i++) {
+    const z = -7.6 - i * 2.4;
+    const tub = new THREE.Group();
+    tub.name = `ice-bath-${team.id}-${i}`;
+    tub.position.set(side * 36.3, 0, z);
+
+    // insulated shell: composite outside, dark liner inside
+    const shell = new THREE.Mesh(
+      new THREE.BoxGeometry(1.5, 0.78, 2.3),
+      materials.compositePanel ?? materials.matteBlackSteel
+    );
+    shell.position.y = 0.39;
+    shell.castShadow = true;
+    shell.receiveShadow = true;
+    tub.add(shell);
+    const liner = new THREE.Mesh(
+      new THREE.BoxGeometry(1.24, 0.62, 2.04),
+      new THREE.MeshStandardMaterial({ color: 0x0d1b22, roughness: 0.22, metalness: 0.5 })
+    );
+    liner.position.y = 0.5;
+    tub.add(liner);
+
+    // the water itself: glossy, slightly emissive so it glows at dusk
+    const water = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.18, 1.98),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x8fd3e8,
+        roughness: 0.06,
+        metalness: 0,
+        clearcoat: 1,
+        clearcoatRoughness: 0.04,
+        envMapIntensity: 1.8,
+        transparent: true,
+        opacity: 0.82,
+        emissive: 0x1d5f78,
+        emissiveIntensity: 0.35,
+        side: THREE.DoubleSide,
+      })
+    );
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = 0.66;
+    tub.add(water);
+
+    // floating ice: instanced cubes, deterministic sizes
+    const iceCount = 12;
+    const ice = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xdff4ff,
+        roughness: 0.14,
+        metalness: 0,
+        transparent: true,
+        opacity: 0.72,
+        clearcoat: 1,
+        envMapIntensity: 2.2,
+      }),
+      iceCount
+    );
+    const dice = mulberry32(700 + i * 13 + (team.id === "alpha" ? 1 : 2));
+    const dummyIce = new THREE.Object3D();
+    for (let k = 0; k < iceCount; k++) {
+      const size = 0.1 + dice() * 0.09;
+      dummyIce.position.set((dice() - 0.5) * 0.9, 0.68 + dice() * 0.02, (dice() - 0.5) * 1.7);
+      dummyIce.rotation.set(dice() * Math.PI, dice() * Math.PI, dice() * Math.PI);
+      dummyIce.scale.set(size, size * 0.7, size);
+      dummyIce.updateMatrix();
+      ice.setMatrixAt(k, dummyIce.matrix);
+    }
+    ice.instanceMatrix.needsUpdate = true;
+    tub.add(ice);
+
+    // cold vapour drifting off the surface
+    const vapourCount = 26;
+    const vapourPositions = new Float32Array(vapourCount * 3);
+    for (let v = 0; v < vapourCount; v++) {
+      vapourPositions[v * 3] = (Math.random() - 0.5) * 1.1;
+      vapourPositions[v * 3 + 1] = 0.7 + Math.random() * 0.5;
+      vapourPositions[v * 3 + 2] = (Math.random() - 0.5) * 1.9;
+    }
+    const vapourGeometry = new THREE.BufferGeometry();
+    vapourGeometry.setAttribute("position", new THREE.BufferAttribute(vapourPositions, 3));
+    const vapour = new THREE.Points(
+      vapourGeometry,
+      new THREE.PointsMaterial({
+        color: 0xdff4ff,
+        size: 0.09,
+        transparent: true,
+        opacity: 0.3,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    tub.add(vapour);
+    updates.push((t, dt) => {
+      const attr = vapourGeometry.getAttribute("position");
+      for (let v = 0; v < vapourCount; v++) {
+        let y = attr.getY(v) + dt * 0.14;
+        if (y > 1.5) y = 0.7;
+        attr.setY(v, y);
+        attr.setX(v, attr.getX(v) + Math.sin(t * 0.5 + v) * 0.0006);
+      }
+      attr.needsUpdate = true;
+      // slow boil of the surface: a whisper of movement, not a wave
+      water.position.y = 0.66 + Math.sin(t * 0.9 + i) * 0.004;
+    });
+
+    // step + grab rail + temperature readout
+    const step = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.24, 1.9), materials.wetRoom);
+    step.position.set(-side * 1.0, 0.12, 0);
+    tub.add(step);
+    [-1, 1].forEach((end) => {
+      const rail = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.028, 0.028, 0.9, 10),
+        materials.brushedAluminum
+      );
+      rail.position.set(-side * 0.6, 0.5, end * 0.95);
+      tub.add(rail);
+    });
+    const readout = createSmartSurface({
+      width: 0.72,
+      height: 0.42,
+      pixels: 256,
+      interval: 0.6,
+      registry,
+      name: `ice-bath-readout-${team.id}-${i}`,
+      draw: (ctx, w, h, t) => {
+        const pulse = 0.55 + 0.45 * Math.sin(t * 1.1 + i);
+        ctx.fillStyle = "#04090d";
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = `rgba(90, 210, 255, ${0.14 + pulse * 0.12})`;
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = "#eaf7ff";
+        ctx.font = `600 ${Math.round(w * 0.3)}px ${FONT}`;
+        ctx.fillText(`${(4 + Math.sin(t * 0.2 + i) * 0.3).toFixed(1)}°C`, w * 0.08, h * 0.44);
+        ctx.fillStyle = "rgba(220,240,255,0.62)";
+        ctx.font = `500 ${Math.round(w * 0.11)}px ${FONT}`;
+        ctx.fillText("COLD PLUNGE · 3 MIN", w * 0.08, h * 0.86);
+      },
+    });
+    readout.mesh.position.set(-side * 0.78, 0.88, 0);
+    readout.mesh.rotation.y = -side * Math.PI / 2;
+    tub.add(readout.mesh);
+    screens.push(readout);
+
+    wet.add(tub);
+  }
+
   group.add(wet);
 
   /* chromotherapy programme cycling */

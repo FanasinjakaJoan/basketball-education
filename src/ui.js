@@ -5,7 +5,7 @@
  * telemetry, systems gauges, event log and the 2D minimap of plan mode.
  */
 import { STRINGS, t as tr } from "./i18n.js";
-import { ZONES, HALL, WING, COURT, SITE } from "./plan.js";
+import { ZONES, QUICK_VIEWS, HALL, WING, COURT, SITE } from "./plan.js";
 import { CHAPTERS, FILM_DURATION } from "./cinematic.js";
 
 function resolvePath(object, path) {
@@ -41,6 +41,11 @@ export function createUi(handlers = {}) {
     qualityRow: el("quality-row"),
     letterboxButton: el("letterbox-button"),
     speedSelect: el("speed-select"),
+    quickRow: el("quick-row"),
+    xrayButton: el("xray-button"),
+    mirrorButton: el("mirror-button"),
+    recordButton: el("record-button"),
+    recTime: el("rec-time"),
   };
 
   let language = document.documentElement.lang || "en";
@@ -64,6 +69,7 @@ export function createUi(handlers = {}) {
       tab.setAttribute("aria-selected", String(active));
     });
     buildChapters();
+    buildQuickViews();
     buildZones();
     buildToggles();
     buildScenarios();
@@ -101,6 +107,24 @@ export function createUi(handlers = {}) {
     const whole = Math.floor(value);
     const tenths = Math.floor((value - whole) * 10);
     return `00:${String(whole).padStart(2, "0")}.${tenths}`;
+  }
+
+  /* ---------------- guided jumps ---------------- */
+  function buildQuickViews() {
+    if (!dom.quickRow) return;
+    dom.quickRow.innerHTML = "";
+    QUICK_VIEWS.forEach((view) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "chip";
+      button.dataset.view = view.id;
+      button.textContent = tr(view.label, language);
+      button.addEventListener("click", () => {
+        dom.quickRow.querySelectorAll(".chip").forEach((chip) => chip.classList.toggle("is-active", chip === button));
+        handlers.onView?.(view.id);
+      });
+      dom.quickRow.appendChild(button);
+    });
   }
 
   /* ---------------- zone browser ---------------- */
@@ -281,6 +305,47 @@ export function createUi(handlers = {}) {
   });
   dom.letterboxButton?.classList.add("is-active");
 
+  // view switches that live in `runtime.toggles` like the IoT layers
+  [
+    { node: dom.xrayButton, key: "xray" },
+    { node: dom.mirrorButton, key: "mirrorFloor" },
+  ].forEach(({ node, key }) => {
+    node?.addEventListener("click", () => {
+      const next = !node.classList.contains("is-active");
+      node.classList.toggle("is-active", next);
+      node.setAttribute("aria-pressed", String(next));
+      handlers.onToggle?.(key, next);
+      showToast(tr(STRINGS[key === "xray" ? "xrayHint" : "mirrorFloorHint"], language));
+    });
+  });
+
+  // 4K still / WebM film capture
+  let recordStartedAt = 0;
+  dom.recordButton?.addEventListener("click", () => {
+    const wasRecording = document.body.classList.contains("is-recording");
+    const recording = Boolean(handlers.onRecord?.());
+    // asked to start but the browser refused: MediaRecorder is missing
+    if (!wasRecording && !recording) {
+      showToast(tr(STRINGS.recordUnsupported, language));
+      return;
+    }
+    setRecording(recording);
+  });
+
+  function setRecording(recording) {
+    document.body.classList.toggle("is-recording", recording);
+    dom.recordButton?.classList.toggle("is-active", recording);
+    dom.recordButton?.setAttribute("aria-pressed", String(recording));
+    if (dom.recordButton) {
+      dom.recordButton.textContent = recording
+        ? tr(STRINGS.recordStop, language)
+        : tr(STRINGS.record, language);
+    }
+    if (dom.recTime) dom.recTime.hidden = !recording;
+    recordStartedAt = recording ? performance.now() : 0;
+    if (!recording && dom.recTime) dom.recTime.textContent = "";
+  }
+
   dom.modeSwitch.querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
       dom.modeSwitch.querySelectorAll("button").forEach((b) => b.classList.toggle("is-active", b === button));
@@ -370,6 +435,14 @@ export function createUi(handlers = {}) {
       case "h":
       case "H":
         document.body.classList.toggle("hide-ui");
+        break;
+      case "x":
+      case "X":
+        dom.xrayButton?.click();
+        break;
+      case "r":
+      case "R":
+        dom.recordButton?.click();
         break;
       default:
         break;
@@ -485,6 +558,11 @@ export function createUi(handlers = {}) {
     }
 
     document.body.classList.toggle("is-plan", mode === "plan");
+
+    if (recordStartedAt && dom.recTime) {
+      const seconds = (performance.now() - recordStartedAt) / 1000;
+      dom.recTime.textContent = `REC ${format(seconds)}`;
+    }
   }
 
   function finishLoading() {
@@ -502,6 +580,7 @@ export function createUi(handlers = {}) {
     showToast,
     finishLoading,
     setMode,
+    setRecording,
     get language() {
       return language;
     },

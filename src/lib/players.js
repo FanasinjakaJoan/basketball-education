@@ -181,6 +181,10 @@ export const ROUTINES = [
   { type: "pass", from: [5.4, -3.2], to: [8.8, 3.2], period: 3.4, phase: 0.0 },
   { type: "sprint", a: [-11.5, -6.6], b: [11.5, -6.6], period: 5.2, phase: 1.1 },
   { type: "zigzag", speed: 3.0, z0: 4.4, z1: -4.4, x0: 10, x1: 2, phase: 2.0 },
+  // ten capsules in all: five per team. The last two are the perimeter
+  // defender closing out the wing, and the baseline shuttle on the far touchline.
+  { type: "spot", spots: [[4.4, -4.6], [7.0, 0.2], [4.4, 4.6]], dwell: 2.1, phase: 2.6 },
+  { type: "sprint", a: [-11.5, 6.6], b: [11.5, 6.6], period: 5.6, phase: 3.4 },
 ];
 
 function lapPosition(t, routine, out) {

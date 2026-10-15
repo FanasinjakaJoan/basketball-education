@@ -334,6 +334,14 @@ export function createLedFloor({ activation = 0 } = {}) {
 /* retractable automated hoops                                         */
 /* ------------------------------------------------------------------ */
 
+/* The carriage holds the rim 0.34 m below its own origin, so the parked and
+ * playing heights are expressed once, here: 10.2 m stowed against the roof,
+ * and deployed at exactly the FIBA 3.05 m to the top of the ring. */
+const RIM_OFFSET = 0.34;
+const RIM_TUBE = 0.018;
+const STOW_Y = 10.2;
+const DEPLOY_Y = COURT.rimHeight + RIM_OFFSET - RIM_TUBE; // 3.372 → rim top at 3.05
+
 export function createHoop({ side = -1, materials }) {
   const group = new THREE.Group();
   group.name = `hoop-${side < 0 ? "west" : "east"}`;
@@ -408,10 +416,10 @@ export function createHoop({ side = -1, materials }) {
 
   // rim + net
   const rimGroup = new THREE.Group();
-  rimGroup.position.set(-0.15, -0.34, 0);
+  rimGroup.position.set(-0.15, -RIM_OFFSET, 0);
   boardPivot.add(rimGroup);
   const rim = new THREE.Mesh(
-    new THREE.TorusGeometry(COURT.rimDiameter / 2, 0.018, 10, 28),
+    new THREE.TorusGeometry(COURT.rimDiameter / 2, RIM_TUBE, 10, 28),
     new THREE.MeshStandardMaterial({ color: 0xf06a2c, roughness: 0.35, metalness: 0.75 })
   );
   rim.rotation.x = Math.PI / 2;
@@ -455,7 +463,7 @@ export function createHoop({ side = -1, materials }) {
   const update = (deploy) => {
     const ease = clamp((deploy - 0.25) / 0.75, 0, 1);
     const smooth = ease * ease * (3 - 2 * ease);
-    carriage.position.y = THREE.MathUtils.lerp(7.2, 3.55, smooth);
+    carriage.position.y = THREE.MathUtils.lerp(STOW_Y, DEPLOY_Y, smooth);
     boardPivot.rotation.z = THREE.MathUtils.lerp(side * 1.42, 0, clamp(deploy / 0.6, 0, 1));
     carriageLight.material.emissiveIntensity = deploy > 0.05 ? 1.8 + Math.sin(performance.now() * 0.004) * 0.4 : 0.6;
     rimGroup.visible = smooth > 0.6;

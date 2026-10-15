@@ -18,7 +18,8 @@ Everything is served statically: no server-side code, no network calls, no build
 npm install                 # three 0.169 · esbuild · puppeteer-core (dev only)
 npm run build               # bundles src/ → assets/smart-complex.bundle.js
 npm run serve               # static server on http://localhost:8080
-npm run verify              # headless smoke test of complex.html
+npm run verify:modules      # structural check: builds every zone in plain Node (no browser)
+npm run verify              # headless Chromium smoke test of complex.html
 ```
 
 * Open `http://localhost:8080/index.html` for the deck (it links to the 3D model from the top bar).
@@ -37,7 +38,7 @@ npm run verify              # headless smoke test of complex.html
 
 A 34 × 46 m hall with a 14 m clear height, flanked by two mirrored 18 × 32 m residential wings on
 three levels, inside a 420 × 420 m landscaped site. The scene is built from primitives at load
-time (no external assets): ~1 700 meshes, 42 instanced groups, 34 lights.
+time (no external assets): 1 782 meshes, 46 instanced groups, 30 lights.
 
 | Zone (13) | Contents |
 | --- | --- |
@@ -48,7 +49,7 @@ time (no external assets): ~1 700 meshes, 42 instanced groups, 34 lights.
 | Link corridors & proximity doors | Two glazed bridges (3 m × 3.75 m) between hall and wings, 4 automated door pairs at 0.4 s |
 | Dormitory wing — Team Alpha | 13 smart pods with biometric sleep tracking, PDLC privacy partitions, lockers, gym, wet zone |
 | Dormitory wing — Team Beta | Mirror image of Alpha (accent colour swap: cyan ⇄ amber) |
-| Showers, sanitary & cryotherapy | 12 showers, 6 touchless smart mirrors, 2 cryo pods at −110 °C, 68 % water recycling |
+| Showers, sanitary & cryotherapy | 12 showers, 6 touchless smart mirrors, 2 cryo pods at −110 °C, 4 ice baths at 4 °C, 68 % water recycling |
 | Tactical operations centre | Mezzanine war room (+5.40), 9 m curved holographic wall, 8 coach workstations, live telemetry |
 | VIP & guest lounge deck | 17.6 × 5.8 m mezzanine deck above the court, 48 guests, switchable electrochromic glass |
 | Study hall & team lounge | Level-2 study level (+7.60), 90 school minutes per day per athlete |
@@ -86,14 +87,37 @@ deterministic for any given `t`.
 | `←` `→` | Scrub ∓1 s (the focusable timeline bar scrubs 1 s, `Shift` + arrow 5 s) |
 | `1` `2` `3` `4` | Jump to a chapter |
 | `C` / `E` / `P` | Cinematic / Explore / Floor-plan mode |
+| `X` | X-ray the shell (roof, envelope and upper pods hidden) |
+| `R` | Start / stop the WebM film recording |
 | `H` | Hide the interface (letterbox stays) |
 | Mouse drag / wheel | Orbit and zoom (Explore and Floor-plan modes) |
 | Click a zone | Fly to that zone, then hand control back |
 | `?` (help button) | Shortcut sheet |
 
-HUD buttons: mode switch, play, restart, speed (0.5× / 1× / 1.5× / 2×), 4K capture, letterbox toggle,
-language switch (EN / FR / MG), quality selector, scenario presets, the 9 IoT toggles, the zone
+HUD buttons: mode switch, **guided jumps** (9 viewpoint chips: court, Alpha, Beta, showers,
+cryotherapy, command, VIP, exterior, entrance), play, restart, speed (0.5× / 1× / 1.5× / 2×),
+x-ray, mirror floor, 4K still, WebM record, letterbox toggle, language switch (EN / FR / MG),
+quality selector, scenario presets (training / game night / recovery), the 9 IoT toggles, the zone
 browser, telemetry, system gauges, event log and the floor-plan minimap.
+
+### Atmosphere, optics and reflection
+
+| Layer | Implementation |
+| --- | --- |
+| Fog | `FogExp2` at density 0.0021 — depth that stays correct as the camera pushes through the wings |
+| Sky | Single shader dome: dusk gradient, sun glow, twinkling stars |
+| Sun | Warm amber `DirectionalLight` at 2.2, PCF soft shadows on a 2048² map |
+| Skylight | Cool blue `HemisphereLight` at 0.35, plus an interior fill keyed to the film |
+| Volumetric beams | One additive box beam per roof skylight (6), a raking sun beam through the sunlit glazed end, a soft sky bounce at the shaded end, and the entrance portal volume — 9 beams, one shader, animated motes |
+| Reflection | `ResinMirror` (three.js `Reflector` maths, rewritten): a fresnel-weighted, micro-rippled blend that keeps the LED floor visible under the reflection. It renders **one layer only** — the court furniture and the athletes — so the extra pass costs a few hundred triangles rather than the whole complex. Off by default (`Mirror floor` chip / `smartComplex.mirror(true)`) |
+| Bloom | `UnrealBloomPass` 0.55 / radius 0.5 / threshold 0.85 on the Cinematic tier (0.62 on Ultra) |
+| Tone mapping | ACES Filmic + `OutputPass`, then `SMAA` **after** the colour-space conversion — anti-aliasing on the resolved image rather than in linear HDR |
+
+Tone mapping is switchable, because it is the single most opinionated knob in the pipeline:
+
+* `?tone=agx` (or `?tone=neutral`) on the URL, e.g. `complex.html?tone=agx`
+* `?exposure=1.1` to override the exposure for that pipeline
+* `smartComplex.tone("agx")` at runtime, or `app.api.setToneMapping("aces", 0.95)`
 
 ### The 9 IoT toggles
 
@@ -124,10 +148,10 @@ during play.
 
 | Tier | Pixel ratio | Shadows | Bloom | SMAA | Anisotropy | Trees |
 | --- | --- | --- | --- | --- | --- | --- |
-| Performance (`low`) | 0.85 | off | 0.22 | off | 2 | 60 |
-| Balanced (`medium`) | 1 | off | 0.32 | off | 4 | 90 |
-| High (`high`, default) | ≤1.5 | on | 0.42 | on | 8 | 120 |
-| Ultra (`ultra`) | ≤2 | on | 0.5 | on | 16 | 150 |
+| Performance (`low`) | 0.85 | off | 0.28 | off | 2 | 60 |
+| Balanced (`medium`) | 1 | off | 0.4 | off | 4 | 90 |
+| High (`high`, default) | ≤1.5 | on | 0.55 | on | 8 | 120 |
+| Ultra (`ultra`) | ≤2 | on | 0.62 | on | 16 | 150 |
 
 Force a tier for a capture with `window.__quality = "ultra"` **before** the page loads (an
 `evaluateOnNewDocument` hook), or switch at runtime from the quality row.
@@ -139,6 +163,12 @@ const app = window.__smartComplex;         // { zones, director, runtime, api, u
 app.api.setMode("plan");                   // cinematic | explore | plan
 app.api.jumpToChapter(3);                  // seek to a chapter and play
 app.api.focusZone("warroom");              // fly to a zone preset
+app.api.focusView("showers");              // guided jump: court | alpha | beta | showers |
+                                           // recovery | command | vip | exterior | entrance
+app.api.setXray(true);                     // cutaway shell, independent of plan mode
+app.api.setMirrorFloor(true);              // polished-resin reflection on the court
+app.api.setToneMapping("agx", 0.8);         // aces | agx | neutral
+app.api.toggleRecord();                    // WebM straight off the WebGL canvas
 app.api.setScenario("game");               // training | game | recovery
 app.api.setQuality("high");
 app.runtime.toggles.ledFloor = false;      // any of the 9 IoT toggles
@@ -152,8 +182,8 @@ await app.api.capture();                   // 4K PNG data URL of the current fra
 
 `step()` plus `probe()` are what the screenshot/verification tooling uses: render a fixed number
 of frames after a `seek`, then read the canvas. `src/index.js` also exposes short aliases for
-presenters: `smartComplex.play(t)`, `.pause()`, `.mode()`, `.zone()`, `.scenario()`,
-`.quality()`, `.language("fr")`.
+presenters: `smartComplex.play(t)`, `.pause()`, `.mode()`, `.zone()`, `.view()`, `.scenario()`,
+`.quality()`, `.xray()`, `.mirror()`, `.tone()`, `.record()`, `.language("fr")`.
 
 ### Languages and layout
 
@@ -189,20 +219,39 @@ python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('docs/floor-plan.svg')
 
 ## Verification
 
+Two layers, because they catch different things:
+
 ```bash
 npm run build
+npm run verify:modules                              # no browser needed, ~1 s
 npm run serve &                                     # or any static server on :8080
 CHROME_PATH=/path/to/chrome node tools/verify-scene.mjs
 ```
 
-`tools/verify-scene.mjs` boots `complex.html` headless, asserts WebGL 2 is up, then checks the
-scene registers ≥13 zones with a matching zone browser, exactly 9 IoT toggles, 4 chapters,
-5 telemetry rows, >800 meshes, >12 lights, that the film is 35 s long and that jumping to every
-chapter produces **no console errors or warnings**. Current output:
+`tools/verify-modules.mjs` runs the **real zone builders** — shell, court, wings, war room, VIP,
+landscape, the volumetric beams and the resin mirror — in plain Node against a stubbed 2D canvas,
+then asserts the numbers the design brief quotes: ten player capsules with ten ground rings,
+hoops stowed at exactly y = 10.2 and deployed to a 3.05 m rim top, two ice baths per wing, six roof
+skylights with a beam each, frosted glass at 0.16 opacity, and a reflection pass restricted to a
+single layer. It is the check that runs anywhere, including CI without a GPU.
+
+`tools/verify-scene.mjs` boots `complex.html` in headless Chromium, asserts WebGL 2 is up, then
+checks ≥13 zones with a matching zone browser, exactly 9 IoT toggles, 4 chapters, 5 telemetry rows,
+>800 meshes, >12 lights, 9 guided-jump chips, the tone-mapping switch, that x-ray hides and
+restores the shell, that the mirror is opt-in, that the film is 35 s long and that jumping to every
+chapter produces **no console errors or warnings**.
 
 ```
-scene ok · meshes 1699 · instanced 42 · lights 34 · zones 13 · film 35s · event log 0 lines
-verify-scene: all checks passed
+$ npm run verify:modules
+architecture
+  ok   ice baths: two per wing (4)
+court
+  ok   hoops stow at y = 10.2 (10.2, 10.2)
+  ok   hoops deploy to the FIBA 3.05 m rim top (3.05, 3.05)
+atmosphere + optics
+  ok   volumetric beams: one per skylight, the raking sun, the sky bounce, the portal (9)
+  ok   court furniture is tagged for the reflection (461 meshes)
+verify-modules: all checks passed
 ```
 
 ---
@@ -216,7 +265,9 @@ complex.html            3D viewer page: canvas #scene + the whole HUD
 assets/complex.css      HUD theme: cinema bars, glass panels, toggles, gauges, minimap
 assets/smart-complex.bundle.js   built bundle (committed) — do not edit by hand
 src/index.js            bundle entry
-src/main.js             renderer, camera, lighting, quality tiers, modes, public api
+src/main.js             renderer, camera, lighting, quality tiers, modes, recording, public api
+src/lib/volumetrics.js  additive light shafts: skylights, glazed ends, entrance portal
+src/lib/mirror.js       ResinMirror — layer-restricted, fresnel-weighted court reflection
 src/plan.js             single source of truth for every dimension (SITE, HALL, COURT, WING…)
 src/cinematic.js        the 35 s film: shots, splines, chapters, director (seek/play/tween)
 src/iot.js              IoT model: scenarios, toggles, 24 player uplinks, event log

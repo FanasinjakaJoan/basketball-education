@@ -799,6 +799,9 @@ export function buildShell({ materials, registry, state, doors }) {
     doors: [mainDoor, playerDoor],
     updates,
     roof,
+    // flattened for consumers that only care about the openings: the
+    // volumetric beams hang off these exact strips
+    skylights: roof.skylights,
     mezzanines: { south: southMezz, north: northMezz },
   };
 }

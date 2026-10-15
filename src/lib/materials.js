@@ -162,10 +162,14 @@ export function createMaterials(detail = {}) {
     depthWrite: false,
     envMapIntensity: 1.2,
   });
+  // Smart frosted glazing: 0.16 opacity, double-sided, no depth write — the
+  // PDLC panels read as glass that *will* go opaque, not as milk.
   m.frostedGlassClear = m.frostedGlass.clone();
   m.frostedGlassClear.map = null;
-  m.frostedGlassClear.opacity = 0.14;
+  m.frostedGlassClear.opacity = 0.16;
   m.frostedGlassClear.roughness = 0.12;
+  m.frostedGlassClear.depthWrite = false;
+  m.frostedGlassClear.side = THREE.DoubleSide;
   m.blackGlass = new THREE.MeshPhysicalMaterial({
     color: 0x080b10,
     roughness: 0.08,

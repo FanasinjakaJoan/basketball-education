@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b1722" />
+    <meta name="description" content="A trilingual visual pitch deck for Hoop Horizons Madagascar." />
+    <title>Hoop Horizons Madagascar — Pilot Deck</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a id="brand-home" class="brand-lockup" href="#slide-1" aria-label="Hoop Horizons Madagascar, slide one">
+          <span class="brand-emblem" aria-hidden="true"><span>H</span><i></i><span>H</span></span>
+          <span class="brand-copy">
+            <strong>Hoop Horizons</strong>
+            <small id="brand-subtitle">Madagascar · Pilot plan</small>
+          </span>
+        </a>
+        <div class="topbar-right">
+          <span id="deck-label" class="deck-label"></span>
+          <div id="language-switch" class="language-switch" role="tablist" aria-label="Choose presentation language">
+            <button id="language-tab-en" class="language-tab is-active" type="button" role="tab" data-lang="en" aria-selected="true">EN</button>
+            <button id="language-tab-fr" class="language-tab" type="button" role="tab" data-lang="fr" aria-selected="false">FR</button>
+            <button id="language-tab-mg" class="language-tab" type="button" role="tab" data-lang="mg" aria-selected="false">MG</button>
+          </div>
+          <button id="present-button" class="present-button" type="button">
+            <span class="present-icon" aria-hidden="true">↗</span>
+            <span id="present-label"></span>
+          </button>
+        </div>
+      </header>
+
+      <main class="main-content">
+        <div class="deck-overline">
+          <span class="deck-overline-dot"></span>
+          <span id="deck-overline-text"></span>
+          <span class="overline-divider"></span>
+          <span class="overline-subtitle">ANTANANARIVO · 2026</span>
+        </div>
+
+        <section id="slide-mount" class="slide-mount" aria-live="polite" aria-atomic="true"></section>
+
+        <nav id="deck-nav" class="deck-nav" aria-label="Slide navigation">
+          <button id="previous-button" class="arrow-button" type="button" aria-label="Previous slide">←</button>
+          <div class="progress-wrap">
+            <div class="progress-topline">
+              <span id="current-slide-number" class="current-slide-number">01</span>
+              <div id="slide-dots" class="slide-dots" aria-label="Choose slide"></div>
+              <span id="total-slide-number" class="total-slide-number">10</span>
+            </div>
+            <div class="progress-track"><span id="progress-bar"></span></div>
+          </div>
+          <button id="next-button" class="arrow-button arrow-button-next" type="button" aria-label="Next slide">→</button>
+        </nav>
+      </main>
+
+      <footer class="site-footer">
+        <span id="footer-note"></span>
+        <span id="footer-slogan" class="footer-right"></span>
+      </footer>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
